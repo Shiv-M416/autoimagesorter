@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Auto Image Sorter</title>
+    <!-- Addition 1: Links to your manifest file -->
+    <link rel="manifest" href="manifest.json">
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body { 
@@ -206,6 +208,11 @@
     </div>
 
     <script>
+        // Addition 2: Registers the service worker at the start of the script
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('./sw.js').catch(() => {});
+        }
+
         const taxonomy = {
             "Vehicle": ["Sedan", "SUV", "Armored Vehicle", "Truck", "Motorcycle", "General Vehicle"],
             "Firearms & Tactical": ["Pistol", "Assault Rifle", "Sniper Rifle", "Shotgun", "Tactical Gear"],
@@ -238,7 +245,7 @@
 
         function runTestDemo() {
             logTerminal(`[DEMO] Loading test suite...`);
-            assets = []; // reset for fresh test run
+            assets = [];
             const demoItems = [
                 { name: "sedan_v8.png", type: "Vehicle", sub: "Sedan", color: "#18181b" },
                 { name: "suv_recon.png", type: "Vehicle", sub: "SUV", color: "#27272a" },
@@ -256,7 +263,6 @@
                     ctx.fillStyle = item.color;
                     ctx.fillRect(0, 0, 400, 300);
                     
-                    // Clean text rendering
                     ctx.fillStyle = "#ffffff";
                     ctx.font = "bold 22px monospace";
                     ctx.fillText(item.name.split('_')[0].toUpperCase(), 30, 120);
@@ -395,48 +401,4 @@
             activeAssetId = id;
             const asset = assets.find(a => a.id === id);
             if (!asset) return;
-            document.getElementById('modalImg').src = asset.url;
-            document.getElementById('modalMetadata').innerHTML = `
-                <div>ID: ${asset.id}</div>
-                <div>NAME: ${asset.name}</div>
-                <div>DIMS: ${asset.dimensions}</div>
-                <div>SIZE: ${asset.size}</div>
-            `;
-            const mainSel = document.getElementById('modalMainCat');
-            mainSel.innerHTML = Object.keys(taxonomy).map(m => `<option value="${m}" ${m === asset.mainCat ? 'selected' : ''}>${m}</option>`).join('');
-            updateSubcatOptions(asset.subCat);
-            document.getElementById('inspectorModal').classList.add('active');
-        }
-
-        function updateSubcatOptions(selectedSub = null) {
-            const mainSel = document.getElementById('modalMainCat').value;
-            const subSel = document.getElementById('modalSubCat');
-            const subs = taxonomy[mainSel] || [];
-            subSel.innerHTML = subs.map(s => `<option value="${s}" ${s === selectedSub ? 'selected' : ''}>${s}</option>`).join('');
-        }
-
-        function saveAssetChanges() {
-            const asset = assets.find(a => a.id === activeAssetId);
-            if (asset) {
-                asset.mainCat = document.getElementById('modalMainCat').value;
-                asset.subCat = document.getElementById('modalSubCat').value;
-                saveAndRefresh();
-                logTerminal(`[UPDATED] Asset recategorized`);
-            }
-            closeModal();
-        }
-
-        function deleteCurrentAsset() {
-            assets = assets.filter(a => a.id !== activeAssetId);
-            saveAndRefresh();
-            logTerminal(`[DELETED] Asset removed`);
-            closeModal();
-        }
-
-        function closeModal() { document.getElementById('inspectorModal').classList.remove('active'); activeAssetId = null; }
-        function clearAllData() { if (confirm("Clear library?")) { assets = []; saveAndRefresh(); logTerminal(`[SYS] Cleared.`); } }
-
-        renderApp();
-    </script>
-</body>
-</html>
+            document.getElementById('modalImg').src = asset.
