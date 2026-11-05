@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Auto Image Sorter</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; 
+            background-color: #090a0f; 
+            color: #f3f4f6; 
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        .mono { font-family: monospace; }
+        
+        header {
+            background-color: #090a0fa6;
+            border-bottom: 1px solid #27272a;
+            position: sticky;
+            top: 0;
+            z-index: 50;
+            padding: 12px 16px;
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            backdrop-filter: blur(8px);
+        }
+        .logo-box { display: flex; align-items: center; gap: 12px; }
+        .badge-ais {
+            width: 40px; height: 40px;
+            border-radius: 6px;
+            background: rgba(245, 158, 11, 0.1);
+            border: 1px solid rgba(245, 158, 11, 0.3);
+            display: flex; align-items: center; justify-content: center;
+            color: #f59e0b; font-weight: bold; font-size: 16px;
+        }
+        .header-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+        button, label.upload-btn {
+            padding: 8px 14px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            border: 1px solid transparent;
+        }
+        .btn-amber { background-color: #f59e0b; color: #000; }
+        .btn-zinc { background-color: #18181b; border-color: #3f3f46; color: #f59e0b; }
+        
+        .workspace { display: flex; flex: 1; flex-direction: column; }
+        @media(min-width: 1024px) { .workspace { flex-direction: row; } }
+        
+        aside {
+            background-color: rgba(9, 10, 15, 0.5);
+            border-right: 1px solid #27272a;
+            padding: 16px;
+            display: flex; flex-direction: column; gap: 16px;
+            width: 100%;
+        }
+        @media(min-width: 1024px) { aside { width: 320px; min-height: calc(100vh - 65px); } }
+        
+        input[type="text"] {
+            width: 100%; background: #18181b; border: 1px solid #27272a;
+            border-radius: 6px; padding: 8px 12px; font-size: 12px; color: #fff; outline: none;
+        }
+        .tree-container { flex: 1; overflow-y: auto; max-height: 250px; }
+        @media(min-width: 1024px) { .tree-container { max-height: none; } }
+        
+        .terminal {
+            background: #000; border: 1px solid #27272a; border-radius: 6px;
+            padding: 10px; font-size: 11px; color: #a1a1aa; height: 130px;
+            display: flex; flex-direction: column;
+        }
+        .terminal-log { flex: 1; overflow-y: auto; margin-top: 4px; color: #d4d4d8; }
+        
+        main { flex: 1; padding: 16px; display: flex; flex-direction: column; gap: 16px; }
+        .dropzone {
+            border: 2px dashed #27272a; border-radius: 10px; padding: 20px;
+            text-align: center; background: rgba(24, 24, 27, 0.2); cursor: pointer;
+        }
+        
+        .image-grid {
+            display: grid;
+            grid-template-columns: repeat(1, 1fr);
+            gap: 16px;
+        }
+        @media(min-width: 640px) { .image-grid { grid-template-columns: repeat(2, 1fr); } }
+        @media(min-width: 1024px) { .image-grid { grid-template-columns: repeat(3, 1fr); } }
+        @media(min-width: 1280px) { .image-grid { grid-template-columns: repeat(4, 1fr); } }
+        
+        .asset-card {
+            background: #18181b; border: 1px solid #27272a; border-radius: 8px;
+            overflow: hidden; display: flex; flex-direction: column; cursor: pointer;
+        }
+        .asset-thumb {
+            width: 100%;
+            height: 140px;
+            background: #000;
+            position: relative;
+            flex-shrink: 0;
+        }
+        .asset-thumb img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
+        }
+        .asset-info { padding: 10px; display: flex; flex-direction: column; gap: 6px; }
+        
+        .modal-overlay {
+            position: fixed; inset: 0; background: rgba(0,0,0,0.8);
+            display: none; align-items: center; justify-content: center; padding: 16px; z-index: 100;
+        }
+        .modal-overlay.active { display: flex; }
+        .modal-content {
+            background: #18181b; border: 1px solid #27272a; border-radius: 12px;
+            max-width: 480px; width: 100%; padding: 20px; display: flex; flex-direction: column; gap: 16px;
+        }
+        select { width: 100%; background: #090a0f; border: 1px solid #3f3f46; color: #fff; padding: 8px; border-radius: 6px; font-size: 12px; }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="logo-box">
+            <div class="badge-ais mono">AIS</div>
+            <div>
+                <h1 style="font-size: 14px; font-weight: bold; color: #fff;">AUTO IMAGE SORTER</h1>
+                <p style="font-size: 10px; color: #a1a1aa;">Autonomous Classifier</p>
+            </div>
+        </div>
+        <div class="header-actions">
+            <button onclick="runTestDemo()" class="btn-amber">🚀 Run Test Demo</button>
+            <label class="upload-btn btn-zinc">
+                📁 Upload
+                <input type="file" id="fileInput" multiple accept="image/*" style="display:none;" onchange="handleFileUpload(event)">
+            </label>
+        </div>
+    </header>
+
+    <div class="workspace">
+        <aside>
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <span style="font-size: 11px; font-weight: bold; color: #a1a1aa;" class="mono">CATEGORIES</span>
+                <button onclick="resetFilters()" style="background: none; border: none; color: #f59e0b; font-size: 11px;">Show All</button>
+            </div>
+            <input type="text" id="searchInput" placeholder="Search assets..." oninput="renderApp()">
+            <div id="categoryTree" class="tree-container"></div>
+            
+            <div class="terminal">
+                <div style="color: #71717a;" class="mono">AI_TERMINAL</div>
+                <div id="terminalLog" class="terminal-log mono">
+                    <div>[SYS] System online.</div>
+                </div>
+            </div>
+        </aside>
+
+        <main>
+            <div class="dropzone" onclick="document.getElementById('fileInput').click()">
+                <div style="font-size: 22px; margin-bottom: 4px;">📂</div>
+                <p style="font-size: 12px; font-weight: 500; color: #e4e4e7;">Tap here to upload images</p>
+            </div>
+
+            <div style="display: flex; justify-content: space-between; font-size: 11px; color: #a1a1aa;" class="mono">
+                <span id="statsText">Showing 0 assets</span>
+                <button onclick="clearAllData()" style="background: none; border: none; color: #f87171;">Clear Library</button>
+            </div>
+
+            <div id="imageGrid" class="image-grid"></div>
+        </main>
+    </div>
+
+    <!-- Inspector Modal -->
+    <div id="inspectorModal" class="modal-overlay">
+        <div class="modal-content">
+            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #27272a; padding-bottom: 8px;">
+                <h3 style="font-size: 13px; color: #fff;" class="mono">ASSET INSPECTOR</h3>
+                <button onclick="closeModal()" style="background: none; border: none; color: #a1a1aa; font-size: 18px;">&times;</button>
+            </div>
+            <div style="display: flex; gap: 12px;">
+                <img id="modalImg" src="" alt="" style="width: 90px; height: 90px; object-fit: cover; border-radius: 6px; border: 1px solid #27272a;">
+                <div id="modalMetadata" style="font-size: 11px; color: #d4d4d8; display: flex; flex-direction: column; gap: 4px;" class="mono"></div>
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+                <div>
+                    <label style="font-size: 10px; color: #71717a;" class="mono">MAIN CATEGORY</label>
+                    <select id="modalMainCat" onchange="updateSubcatOptions()"></select>
+                </div>
+                <div>
+                    <label style="font-size: 10px; color: #71717a;" class="mono">SUBCATEGORY</label>
+                    <select id="modalSubCat"></select>
+                </div>
+            </div>
+            <div style="display: flex; justify-content: space-between; border-top: 1px solid #27272a; padding-top: 10px;">
+                <button onclick="deleteCurrentAsset()" style="background: rgba(239, 68, 68, 0.1); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.3); padding: 6px 10px; border-radius: 4px; font-size: 11px;">Delete</button>
+                <div style="display: flex; gap: 8px;">
+                    <button onclick="closeModal()" class="btn-zinc">Cancel</button>
+                    <button onclick="saveAssetChanges()" class="btn-amber">Save</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const taxonomy = {
+            "Vehicle": ["Sedan", "SUV", "Armored Vehicle", "Truck", "Motorcycle", "General Vehicle"],
+            "Firearms & Tactical": ["Pistol", "Assault Rifle", "Sniper Rifle", "Shotgun", "Tactical Gear"],
+            "Military Equipment": ["Optics & Scopes", "Communications", "Heavy Ordinance", "Support Equipment"],
+            "Other": ["General / Unassigned"]
+        };
+
+        let assets = JSON.parse(localStorage.getItem('auto_image_sorter_assets') || '[]');
+        let currentFilterMain = null;
+        let currentFilterSub = null;
+        let activeAssetId = null;
+
+        function logTerminal(msg) {
+            const term = document.getElementById('terminalLog');
+            const time = new Date().toLocaleTimeString();
+            term.innerHTML += `<div>[${time}] ${msg}</div>`;
+            term.scrollTop = term.scrollHeight;
+        }
+
+        function classifyImage(filename) {
+            const lower = filename.toLowerCase();
+            if (lower.includes('sedan') || lower.includes('car')) return { main: 'Vehicle', sub: 'Sedan' };
+            if (lower.includes('suv') || lower.includes('jeep')) return { main: 'Vehicle', sub: 'SUV' };
+            if (lower.includes('armor') || lower.includes('tank')) return { main: 'Vehicle', sub: 'Armored Vehicle' };
+            if (lower.includes('pistol') || lower.includes('glock')) return { main: 'Firearms & Tactical', sub: 'Pistol' };
+            if (lower.includes('rifle') || lower.includes('ak47')) return { main: 'Firearms & Tactical', sub: 'Assault Rifle' };
+            if (lower.includes('optic') || lower.includes('scope')) return { main: 'Military Equipment', sub: 'Optics & Scopes' };
+            return { main: 'Vehicle', sub: 'General Vehicle' };
+        }
+
+        function runTestDemo() {
+            logTerminal(`[DEMO] Loading test suite...`);
+            assets = []; // reset for fresh test run
+            const demoItems = [
+                { name: "sedan_v8.png", type: "Vehicle", sub: "Sedan", color: "#18181b" },
+                { name: "suv_recon.png", type: "Vehicle", sub: "SUV", color: "#27272a" },
+                { name: "armored_apc.png", type: "Vehicle", sub: "Armored Vehicle", color: "#3f3f46" },
+                { name: "glock_19x.png", type: "Firearms & Tactical", sub: "Pistol", color: "#166534" },
+                { name: "m4a1_rifle.png", type: "Firearms & Tactical", sub: "Assault Rifle", color: "#1e40af" },
+                { name: "thermal_scope.png", type: "Military Equipment", sub: "Optics & Scopes", color: "#6b21a8" }
+            ];
+
+            demoItems.forEach((item, index) => {
+                setTimeout(() => {
+                    const canvas = document.createElement('canvas');
+                    canvas.width = 400; canvas.height = 300;
+                    const ctx = canvas.getContext('2d');
+                    ctx.fillStyle = item.color;
+                    ctx.fillRect(0, 0, 400, 300);
+                    
+                    // Clean text rendering
+                    ctx.fillStyle = "#ffffff";
+                    ctx.font = "bold 22px monospace";
+                    ctx.fillText(item.name.split('_')[0].toUpperCase(), 30, 120);
+                    
+                    ctx.fillStyle = "#f59e0b";
+                    ctx.font = "14px monospace";
+                    ctx.fillText(`[${item.type}]`, 30, 160);
+
+                    const asset = {
+                        id: 'DEMO-' + Math.random().toString(36).substring(2, 8).toUpperCase(),
+                        name: item.name,
+                        size: '450 KB',
+                        dimensions: '1920x1080px',
+                        date: new Date().toLocaleDateString(),
+                        mainCat: item.type,
+                        subCat: item.sub,
+                        url: canvas.toDataURL()
+                    };
+                    assets.unshift(asset);
+                    saveAndRefresh();
+                    logTerminal(`[LOADED] ${item.name}`);
+                }, index * 200);
+            });
+        }
+
+        function handleFileUpload(e) {
+            const files = e.target.files;
+            Array.from(files).forEach(file => {
+                const reader = new FileReader();
+                reader.onload = function(event) {
+                    const img = new Image();
+                    img.onload = function() {
+                        const classification = classifyImage(file.name);
+                        const asset = {
+                            id: 'AST-' + Math.random().toString(36).substring(2, 8).toUpperCase(),
+                            name: file.name,
+                            size: (file.size / 1024).toFixed(1) + ' KB',
+                            dimensions: `${img.width}x${img.height}px`,
+                            date: new Date().toLocaleDateString(),
+                            mainCat: classification.main,
+                            subCat: classification.sub,
+                            url: event.target.result
+                        };
+                        assets.unshift(asset);
+                        saveAndRefresh();
+                        logTerminal(`[CLASSIFIED] ${file.name}`);
+                    };
+                    img.src = event.target.result;
+                };
+                reader.readAsDataURL(file);
+            });
+        }
+
+        function saveAndRefresh() {
+            localStorage.setItem('auto_image_sorter_assets', JSON.stringify(assets));
+            renderApp();
+        }
+
+        function renderApp() {
+            renderSidebar();
+            renderGrid();
+        }
+
+        function renderSidebar() {
+            const treeEl = document.getElementById('categoryTree');
+            let html = '';
+            for (const [main, subs] of Object.entries(taxonomy)) {
+                const mainCount = assets.filter(a => a.mainCat === main).length;
+                html += `
+                    <div style="margin-bottom: 8px;">
+                        <div onclick="filterByMain('${main}')" style="display: flex; justify-content: space-between; padding: 6px; background: #18181b; border-radius: 4px; cursor: pointer; font-size: 12px; color: ${currentFilterMain === main ? '#f59e0b' : '#e4e4e7'};">
+                            <span>📁 ${main}</span>
+                            <span class="mono" style="font-size: 10px; background: #27272a; padding: 1px 6px; border-radius: 3px;">${mainCount}</span>
+                        </div>
+                        <div style="padding-left: 12px; margin-top: 4px; display: flex; flex-direction: column; gap: 2px;">
+                `;
+                subs.forEach(sub => {
+                    const subCount = assets.filter(a => a.mainCat === main && a.subCat === sub).length;
+                    html += `
+                        <div onclick="filterBySub('${main}', '${sub}')" style="display: flex; justify-content: space-between; padding: 4px 6px; border-radius: 4px; cursor: pointer; font-size: 11px; color: ${currentFilterSub === sub ? '#f59e0b' : '#a1a1aa'};">
+                            <span>↳ ${sub}</span>
+                            <span class="mono" style="font-size: 10px;">${subCount}</span>
+                        </div>
+                    `;
+                });
+                html += `</div></div>`;
+            }
+            treeEl.innerHTML = html;
+        }
+
+        function renderGrid() {
+            const gridEl = document.getElementById('imageGrid');
+            const searchVal = document.getElementById('searchInput').value.toLowerCase();
+            let filtered = assets.filter(a => {
+                const matchesSearch = a.name.toLowerCase().includes(searchVal);
+                const matchesMain = !currentFilterMain || a.mainCat === currentFilterMain;
+                const matchesSub = !currentFilterSub || a.subCat === currentFilterSub;
+                return matchesSearch && matchesMain && matchesSub;
+            });
+
+            document.getElementById('statsText').innerText = `Showing ${filtered.length} of ${assets.length} assets`;
+
+            if (filtered.length === 0) {
+                gridEl.innerHTML = `<div style="grid-column: span 4; text-align: center; padding: 30px; color: #71717a; font-size: 12px;" class="mono">No assets found. Tap "Run Test Demo" above!</div>`;
+                return;
+            }
+
+            let html = '';
+            filtered.forEach(asset => {
+                html += `
+                    <div onclick="openInspector('${asset.id}')" class="asset-card">
+                        <div class="asset-thumb">
+                            <img src="${asset.url}" alt="">
+                        </div>
+                        <div class="asset-info">
+                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                <p style="font-size: 12px; font-weight: 500; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 60%;">${asset.name}</p>
+                                <span style="font-size: 9px; background: rgba(245,158,11,0.1); color: #f59e0b; padding: 2px 6px; border-radius: 4px; border: 1px solid rgba(245,158,11,0.3);" class="mono">${asset.subCat}</span>
+                            </div>
+                            <div style="display: flex; justify-content: space-between; font-size: 10px; color: #71717a;" class="mono">
+                                <span>${asset.dimensions}</span>
+                                <span>${asset.size}</span>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+            gridEl.innerHTML = html;
+        }
+
+        function filterByMain(main) { currentFilterMain = main; currentFilterSub = null; renderApp(); }
+        function filterBySub(main, sub) { currentFilterMain = main; currentFilterSub = sub; renderApp(); }
+        function resetFilters() { currentFilterMain = null; currentFilterSub = null; document.getElementById('searchInput').value = ''; renderApp(); }
+
+        function openInspector(id) {
+            activeAssetId = id;
+            const asset = assets.find(a => a.id === id);
+            if (!asset) return;
+            document.getElementById('modalImg').src = asset.url;
+            document.getElementById('modalMetadata').innerHTML = `
+                <div>ID: ${asset.id}</div>
+                <div>NAME: ${asset.name}</div>
+                <div>DIMS: ${asset.dimensions}</div>
+                <div>SIZE: ${asset.size}</div>
+            `;
+            const mainSel = document.getElementById('modalMainCat');
+            mainSel.innerHTML = Object.keys(taxonomy).map(m => `<option value="${m}" ${m === asset.mainCat ? 'selected' : ''}>${m}</option>`).join('');
+            updateSubcatOptions(asset.subCat);
+            document.getElementById('inspectorModal').classList.add('active');
+        }
+
+        function updateSubcatOptions(selectedSub = null) {
+            const mainSel = document.getElementById('modalMainCat').value;
+            const subSel = document.getElementById('modalSubCat');
+            const subs = taxonomy[mainSel] || [];
+            subSel.innerHTML = subs.map(s => `<option value="${s}" ${s === selectedSub ? 'selected' : ''}>${s}</option>`).join('');
+        }
+
+        function saveAssetChanges() {
+            const asset = assets.find(a => a.id === activeAssetId);
+            if (asset) {
+                asset.mainCat = document.getElementById('modalMainCat').value;
+                asset.subCat = document.getElementById('modalSubCat').value;
+                saveAndRefresh();
+                logTerminal(`[UPDATED] Asset recategorized`);
+            }
+            closeModal();
+        }
+
+        function deleteCurrentAsset() {
+            assets = assets.filter(a => a.id !== activeAssetId);
+            saveAndRefresh();
+            logTerminal(`[DELETED] Asset removed`);
+            closeModal();
+        }
+
+        function closeModal() { document.getElementById('inspectorModal').classList.remove('active'); activeAssetId = null; }
+        function clearAllData() { if (confirm("Clear library?")) { assets = []; saveAndRefresh(); logTerminal(`[SYS] Cleared.`); } }
+
+        renderApp();
+    </script>
+</body>
+</html>
